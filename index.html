@@ -1,0 +1,202 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema de Ventas e Inventario - Spring Boot Style</title>
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- FontAwesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@200;300;400;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #4e73df;
+      --primary-dark: #224abe;
+      --secondary: #858796;
+      --success: #1cc88a;
+      --info: #36b9cc;
+      --warning: #f6c23e;
+      --danger: #e74a3b;
+      --dark: #5a5c69;
+      --light: #f8f9fc;
+      --sidebar-width: 250px;
+    }
+    
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: var(--light);
+      overflow-x: hidden; /* Prevent global horizontal scroll */
+      font-size: 0.9rem;
+    }
+
+    /* --- Layout Wrapper --- */
+    .app-container {
+      display: flex;
+      width: 100%;
+      min-height: 100vh;
+      overflow: hidden; /* Contiene el layout para evitar scrolls dobles */
+    }
+
+    /* --- Sidebar Responsive --- */
+    .sidebar {
+      width: var(--sidebar-width);
+      height: 100vh; /* Altura fija de viewport */
+      background-color: var(--primary);
+      background-image: linear-gradient(180deg, #4e73df 10%, #224abe 100%);
+      background-size: cover;
+      color: white;
+      position: fixed;
+      z-index: 1040; 
+      transition: transform 0.3s ease-in-out;
+      left: 0;
+      top: 0;
+      display: flex;
+      flex-direction: column;
+      /* Critical: Prevent sidebar itself from scrolling horizontally */
+      overflow-x: hidden; 
+    }
+
+    /* Tablet & Mobile: Hidden by default */
+    @media (max-width: 991.98px) {
+      .sidebar {
+        transform: translateX(-100%);
+      }
+      .sidebar.show {
+        transform: translateX(0);
+        box-shadow: 5px 0 15px rgba(0,0,0,0.2);
+      }
+      .main-content {
+        margin-left: 0 !important;
+        width: 100% !important;
+      }
+      .sidebar-overlay {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 1030;
+        display: none;
+        backdrop-filter: blur(2px);
+      }
+      .sidebar-overlay.show {
+        display: block;
+      }
+    }
+
+    /* Desktop: Fixed width logic */
+    @media (min-width: 992px) {
+      .main-content {
+        margin-left: var(--sidebar-width);
+        width: calc(100% - var(--sidebar-width));
+      }
+    }
+
+    /* --- Content Area --- */
+    .main-content {
+      display: flex;
+      flex-direction: column;
+      background-color: var(--light);
+      min-height: 100vh;
+      width: 100%;
+    }
+
+    /* --- Nav Scroll Area --- */
+    /* Area especifica scrolleable dentro del sidebar */
+    .sidebar-scroll-area {
+      flex-grow: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      /* Custom Scrollbar for Sidebar */
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255,255,255,0.3) transparent;
+      
+      /* FIX: Evita que el scroll se propague al body en tablets/moviles */
+      overscroll-behavior: contain;
+    }
+    
+    .sidebar-scroll-area::-webkit-scrollbar {
+      width: 4px;
+    }
+    .sidebar-scroll-area::-webkit-scrollbar-thumb {
+      background-color: rgba(255,255,255,0.3);
+      border-radius: 4px;
+    }
+
+    /* --- Nav Links --- */
+    .nav-link {
+      color: rgba(255,255,255,.8);
+      font-weight: 700;
+      padding: 0.8rem 1rem;
+      border-radius: 0.35rem;
+      margin: 0.2rem 0.8rem; /* Margen lateral seguro */
+      transition: all 0.2s;
+      white-space: nowrap; 
+      display: flex;
+      align-items: center;
+    }
+    .nav-link:hover {
+      color: #fff;
+      background-color: rgba(255,255,255,.1);
+    }
+    .nav-link.active {
+      background-color: #fff !important;
+      color: var(--primary) !important;
+      box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+    }
+
+    /* --- Utilities --- */
+    .shadow-soft { box-shadow: 0 .15rem 1.75rem 0 rgba(58,59,69,.15)!important; }
+    .z-index-1 { z-index: 1; }
+    
+    /* --- POS Specifics --- */
+    .product-card {
+      transition: transform 0.2s;
+      cursor: pointer;
+    }
+    .product-card:hover {
+      transform: translateY(-3px);
+      border-color: var(--primary) !important;
+    }
+    
+    /* Global Scrollbars */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: rgba(0,0,0,0.05); }
+    ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+    
+    /* Mobile Bottom Nav */
+    .mobile-bottom-nav {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: white;
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+      z-index: 1020;
+      padding: 10px;
+    }
+    @media (max-width: 767.98px) {
+      .mobile-bottom-nav { display: flex; }
+      .pos-container { padding-bottom: 70px !important; }
+    }
+  </style>
+<script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0"
+  }
+}
+</script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+    
