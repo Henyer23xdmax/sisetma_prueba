@@ -29,13 +29,10 @@ const LoginScreen = ({ users, onLoginSuccess }: { users: Usuario[], onLoginSucce
         const userClean = username.trim();
         const passClean = password.trim();
 
-        // Depuración: Mostrar en consola qué se está recibiendo
         console.log("Intentando ingresar con:", userClean, passClean);
         
-        // 1. Buscar en el array de datos
         let userFound = users.find(u => u.nombre_usuario === userClean && u.password === passClean);
 
-        // 2. Fallback de seguridad: Si por alguna razón los datos no cargaron passwords, permitir admin/admin hardcoded
         if (!userFound && userClean === 'admin' && passClean === 'admin') {
             console.log("Usando acceso de respaldo admin.");
             userFound = users.find(u => u.nombre_usuario === 'admin') || {
@@ -107,6 +104,282 @@ const LoginScreen = ({ users, onLoginSuccess }: { users: Usuario[], onLoginSucce
                     
                     <div className="text-center mt-4">
                         <small className="text-muted">Versión 2.8.0 &copy; 2025</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// 2. BACKEND CODE GENERATOR COMPONENT
+const BackendGenerator = () => {
+    const [activeFile, setActiveFile] = useState('pom');
+
+    const codes: any = {
+        pom: `<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" ...>
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.fastpos</groupId>
+    <artifactId>backend</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>fastpos-backend</name>
+    <description>API REST para Sistema de Ventas</description>
+    
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.0</version>
+    </parent>
+
+    <properties>
+        <java.version>17</java.version>
+    </properties>
+
+    <dependencies>
+        <!-- Web & API -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!-- Database -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- Utilities -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- Reports (Optional) -->
+        <dependency>
+            <groupId>net.sf.jasperreports</groupId>
+            <artifactId>jasperreports</artifactId>
+            <version>6.20.6</version>
+        </dependency>
+    </dependencies>
+</project>`,
+        props: `# Database Configuration
+spring.datasource.url=jdbc:mysql://localhost:3306/crudjavabd1?useSSL=false&serverTimezone=UTC
+spring.datasource.username=root
+spring.datasource.password=
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQL8Dialect
+
+# File Upload
+spring.servlet.multipart.max-file-size=10MB
+spring.servlet.multipart.max-request-size=10MB`,
+        entities: `package com.fastpos.backend.entity;
+
+import jakarta.persistence.*;
+import lombok.Data;
+import java.util.Date;
+
+@Data
+@Entity
+@Table(name = "producto")
+public class Producto {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long idProducto;
+    private String nombre;
+    
+    @ManyToOne
+    @JoinColumn(name = "id_categoria")
+    private Categoria categoria;
+    
+    @ManyToOne
+    @JoinColumn(name = "id_marca")
+    private Marca marca;
+    
+    // ... otros campos (unidad, presentacion) ...
+    private Double precioReferencia;
+}
+
+@Data
+@Entity
+@Table(name = "lote")
+public class Lote {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long idLote;
+    
+    @Column(unique = true)
+    private String codigoLote;
+    
+    private Date fechaVencimiento;
+    private Integer cantidad;
+    private Double precioCompra;
+    private Double precioVenta;
+    
+    @ManyToOne
+    @JoinColumn(name = "id_producto")
+    private Producto producto;
+}
+
+@Data
+@Entity
+@Table(name = "comprobante") // Venta
+public class Venta {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long idComprobante;
+    
+    private String serie;
+    private Integer numero;
+    private Date fechaEmision;
+    private Double total;
+    
+    @ManyToOne
+    @JoinColumn(name = "id_cliente")
+    private Cliente cliente;
+    
+    @OneToMany(mappedBy = "venta", cascade = CascadeType.ALL)
+    private List<DetalleVenta> detalles;
+}`,
+        service: `package com.fastpos.backend.service;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import java.util.List;
+
+@Service
+public class VentaService {
+
+    @Autowired private LoteRepository loteRepository;
+    @Autowired private VentaRepository ventaRepository;
+
+    @Transactional
+    public Venta realizarVenta(VentaDTO ventaDto) {
+        Venta venta = new Venta();
+        // ... setear cliente, fecha, etc ...
+        
+        for (DetalleDTO item : ventaDto.getItems()) {
+            // 1. Lógica FIFO: Obtener lotes con stock, ordenados por vencimiento (El más viejo primero)
+            List<Lote> lotes = loteRepository.findByProductoIdAndCantidadGreaterThanOrderByFechaVencimientoAsc(
+                item.getIdProducto(), 0
+            );
+            
+            int cantidadRequerida = item.getCantidad();
+            
+            for (Lote lote : lotes) {
+                if (cantidadRequerida <= 0) break;
+                
+                int disponible = lote.getCantidad();
+                int aTomar = Math.min(disponible, cantidadRequerida);
+                
+                // 2. Descontar stock
+                lote.setCantidad(disponible - aTomar);
+                loteRepository.save(lote);
+                
+                cantidadRequerida -= aTomar;
+                
+                // 3. Crear detalle de venta vinculado a este lote específico
+                DetalleVenta detalle = new DetalleVenta();
+                detalle.setProducto(lote.getProducto());
+                detalle.setCantidad(aTomar);
+                detalle.setPrecioUnitario(lote.getPrecioVenta());
+                detalle.setLote(lote); // Trazabilidad
+                venta.addDetalle(detalle);
+            }
+            
+            if (cantidadRequerida > 0) {
+                throw new RuntimeException("Stock insuficiente para producto ID: " + item.getIdProducto());
+            }
+        }
+        
+        return ventaRepository.save(venta);
+    }
+}`,
+        controller: `package com.fastpos.backend.controller;
+
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/ventas")
+@CrossOrigin(origins = "*") // Permitir React
+public class VentaController {
+
+    @Autowired
+    private VentaService ventaService;
+
+    @PostMapping
+    public ResponseEntity<?> crearVenta(@RequestBody VentaDTO ventaDto) {
+        try {
+            Venta nuevaVenta = ventaService.realizarVenta(ventaDto);
+            return ResponseEntity.ok(nuevaVenta);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+    
+    @GetMapping
+    public List<Venta> listarVentas() {
+        return ventaService.findAll();
+    }
+}`
+    };
+
+    return (
+        <div className="container-fluid p-4">
+            <div className="d-flex align-items-center mb-4">
+                <div className="bg-warning text-dark rounded p-2 me-2"><i className="fas fa-code"></i></div>
+                <div>
+                    <h4 className="m-0 fw-bold text-gray-800">Generador de Backend Java</h4>
+                    <p className="text-muted small m-0">Código fuente Spring Boot 3 listo para copiar</p>
+                </div>
+            </div>
+
+            <div className="row">
+                <div className="col-md-3">
+                    <div className="list-group shadow-sm">
+                        <button className={`list-group-item list-group-item-action ${activeFile === 'pom' ? 'active' : ''}`} onClick={() => setActiveFile('pom')}>
+                            <i className="fab fa-java me-2"></i>pom.xml
+                        </button>
+                        <button className={`list-group-item list-group-item-action ${activeFile === 'props' ? 'active' : ''}`} onClick={() => setActiveFile('props')}>
+                            <i className="fas fa-cog me-2"></i>application.properties
+                        </button>
+                        <button className={`list-group-item list-group-item-action ${activeFile === 'entities' ? 'active' : ''}`} onClick={() => setActiveFile('entities')}>
+                            <i className="fas fa-database me-2"></i>Entidades (JPA)
+                        </button>
+                        <button className={`list-group-item list-group-item-action ${activeFile === 'service' ? 'active' : ''}`} onClick={() => setActiveFile('service')}>
+                            <i className="fas fa-cogs me-2"></i>Service (Lógica FIFO)
+                        </button>
+                        <button className={`list-group-item list-group-item-action ${activeFile === 'controller' ? 'active' : ''}`} onClick={() => setActiveFile('controller')}>
+                            <i className="fas fa-network-wired me-2"></i>Controller (REST)
+                        </button>
+                    </div>
+                </div>
+                <div className="col-md-9">
+                    <div className="card shadow border-0">
+                        <div className="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                            <span className="small font-monospace">{activeFile === 'entities' ? 'Entities.java' : activeFile + (activeFile === 'pom' ? '.xml' : '.java')}</span>
+                            <button className="btn btn-sm btn-outline-light" onClick={() => navigator.clipboard.writeText(codes[activeFile])}>
+                                <i className="fas fa-copy me-1"></i> Copiar
+                            </button>
+                        </div>
+                        <div className="card-body bg-dark p-0">
+                            <textarea 
+                                className="form-control bg-dark text-white border-0 font-monospace p-3" 
+                                style={{ height: '500px', resize: 'none', fontSize: '0.85rem' }}
+                                readOnly 
+                                value={codes[activeFile]}
+                            />
+                        </div>
                     </div>
                 </div>
             </div>
@@ -303,6 +576,9 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, toggleSidebar, currentUser, 
                     <li><a href="#" className={`nav-link text-white ${activeTab === 'usuarios' ? 'active' : ''}`} onClick={(e) => handleNav(e, 'usuarios')}><i className="fas fa-user-shield me-2" style={{width: '20px'}}></i> Usuarios</a></li>
                     <li><a href="#" className={`nav-link text-white ${activeTab === 'roles' ? 'active' : ''}`} onClick={(e) => handleNav(e, 'roles')}><i className="fas fa-key me-2" style={{width: '20px'}}></i> Roles</a></li>
                     <li><a href="#" className={`nav-link text-white ${activeTab === 'tipos_doc' ? 'active' : ''}`} onClick={(e) => handleNav(e, 'tipos_doc')}><i className="fas fa-id-card me-2" style={{width: '20px'}}></i> Tipos Doc.</a></li>
+                    
+                    <li className="nav-item mt-3 mb-1 text-uppercase text-white-50 small fw-bold ps-2">Desarrollo</li>
+                    <li><a href="#" className={`nav-link text-white ${activeTab === 'backend_gen' ? 'active text-warning' : ''}`} onClick={(e) => handleNav(e, 'backend_gen')}><i className="fas fa-code me-2" style={{width: '20px'}}></i> Código Backend</a></li>
                 </ul>
             </div>
 
@@ -423,6 +699,9 @@ const App = () => {
                         onConfirmPurchase={handleConfirmPurchase} 
                     />
                 }
+                
+                {/* Módulo de Código Backend */}
+                {activeTab === 'backend_gen' && <BackendGenerator />}
 
                 {/* --- CRUD Views Existentes --- */}
                 {activeTab === 'clientes' && <CrudModule title="Clientes" icon="fa-users" data={clients} setData={setClients} idField="id_cliente" 
