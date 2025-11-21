@@ -16,6 +16,104 @@ import GenericModal from './components/GenericModal';
 
 // --- COMPONENTES AUXILIARES ---
 
+// 1. LOGIN SCREEN COMPONENT
+const LoginScreen = ({ users, onLoginSuccess }: { users: Usuario[], onLoginSuccess: (user: Usuario) => void }) => {
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+
+    const handleLogin = (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+        
+        const userClean = username.trim();
+        const passClean = password.trim();
+
+        // Depuración: Mostrar en consola qué se está recibiendo
+        console.log("Intentando ingresar con:", userClean, passClean);
+        
+        // 1. Buscar en el array de datos
+        let userFound = users.find(u => u.nombre_usuario === userClean && u.password === passClean);
+
+        // 2. Fallback de seguridad: Si por alguna razón los datos no cargaron passwords, permitir admin/admin hardcoded
+        if (!userFound && userClean === 'admin' && passClean === 'admin') {
+            console.log("Usando acceso de respaldo admin.");
+            userFound = users.find(u => u.nombre_usuario === 'admin') || {
+                id_usuario: 1, nombre: 'Admin', apellido: 'Sistema', nombre_usuario: 'admin', id_rol: 1, password: 'admin'
+            };
+        }
+
+        if (userFound) {
+            onLoginSuccess(userFound);
+        } else {
+            setError('Credenciales incorrectas. Intente: admin / admin');
+        }
+    };
+
+    return (
+        <div className="d-flex align-items-center justify-content-center vh-100" 
+             style={{ background: 'linear-gradient(135deg, #4e73df 0%, #224abe 100%)' }}>
+            <div className="card border-0 shadow-lg" style={{ width: '100%', maxWidth: '400px', borderRadius: '1rem' }}>
+                <div className="card-body p-5">
+                    <div className="text-center mb-4">
+                        <div className="bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" 
+                             style={{ width: '60px', height: '60px' }}>
+                            <i className="fas fa-bolt fa-2x"></i>
+                        </div>
+                        <h4 className="fw-bold text-gray-900">Bienvenido a FAST POS</h4>
+                        <p className="text-muted small">Ingrese sus credenciales para continuar</p>
+                    </div>
+
+                    {error && (
+                        <div className="alert alert-danger d-flex align-items-center small py-2" role="alert">
+                            <i className="fas fa-exclamation-circle me-2"></i> {error}
+                        </div>
+                    )}
+
+                    <form onSubmit={handleLogin}>
+                        <div className="mb-3">
+                            <label className="form-label small fw-bold text-secondary">Usuario</label>
+                            <div className="input-group">
+                                <span className="input-group-text bg-light border-end-0"><i className="fas fa-user text-muted"></i></span>
+                                <input 
+                                    type="text" 
+                                    className="form-control bg-light border-start-0" 
+                                    placeholder="Ej: admin"
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
+                                    autoComplete="username"
+                                    autoFocus
+                                />
+                            </div>
+                        </div>
+                        <div className="mb-4">
+                            <label className="form-label small fw-bold text-secondary">Contraseña</label>
+                            <div className="input-group">
+                                <span className="input-group-text bg-light border-end-0"><i className="fas fa-lock text-muted"></i></span>
+                                <input 
+                                    type="password" 
+                                    className="form-control bg-light border-start-0" 
+                                    placeholder="••••••"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    autoComplete="current-password"
+                                />
+                            </div>
+                        </div>
+                        <button type="submit" className="btn btn-primary w-100 py-2 fw-bold shadow-sm rounded-pill">
+                            INGRESAR
+                        </button>
+                    </form>
+                    
+                    <div className="text-center mt-4">
+                        <small className="text-muted">Versión 2.8.0 &copy; 2025</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // CrudModule actualizado para soportar select
 const CrudModule = ({ title, icon, data, setData, idField, columns, fields }: any) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -142,7 +240,7 @@ const Dashboard = ({ lotes, products }: any) => {
   );
 };
 
-const Sidebar = ({ activeTab, setActiveTab, isOpen, toggleSidebar }: any) => {
+const Sidebar = ({ activeTab, setActiveTab, isOpen, toggleSidebar, currentUser, roles, onLogout }: any) => {
     const handleNav = (e: React.MouseEvent, tab: string) => {
         e.preventDefault();
         setActiveTab(tab);
@@ -151,19 +249,25 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, toggleSidebar }: any) => {
         }
     };
 
+    const userRoleName = roles.find((r:Rol) => r.id_rol === currentUser?.id_rol)?.nombre || 'Usuario';
+
     return (
-        <div className={`sidebar ${isOpen ? 'show' : ''} d-flex flex-column flex-shrink-0 p-3 text-white`}>
-            <div className="d-flex align-items-center justify-content-between mb-3 mb-md-0 me-md-auto text-white text-decoration-none">
-                <span className="fs-4 fw-bold d-flex align-items-center">
-                    <i className="fas fa-bolt text-warning me-2"></i>FAST POS
-                </span>
-                <button className="btn text-white d-lg-none" onClick={toggleSidebar}>
-                    <i className="fas fa-times"></i>
-                </button>
+        <div className={`sidebar ${isOpen ? 'show' : ''} d-flex flex-column flex-shrink-0 text-white`}>
+            {/* Header */}
+            <div className="p-3">
+                <div className="d-flex align-items-center justify-content-between text-white text-decoration-none">
+                    <span className="fs-4 fw-bold d-flex align-items-center">
+                        <i className="fas fa-bolt text-warning me-2"></i>FAST POS
+                    </span>
+                    <button className="btn text-white d-lg-none" onClick={toggleSidebar}>
+                        <i className="fas fa-times"></i>
+                    </button>
+                </div>
+                <hr className="mt-3 mb-0" />
             </div>
-            <hr />
+
             {/* Scroll Area for Sidebar Links */}
-            <div className="sidebar-scroll-area px-1">
+            <div className="sidebar-scroll-area px-1 pb-3">
                 <ul className="nav nav-pills flex-column mb-auto">
                     <li className="nav-item">
                         <a href="#" className={`nav-link text-white ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={(e) => handleNav(e, 'dashboard')}>
@@ -201,6 +305,24 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, toggleSidebar }: any) => {
                     <li><a href="#" className={`nav-link text-white ${activeTab === 'tipos_doc' ? 'active' : ''}`} onClick={(e) => handleNav(e, 'tipos_doc')}><i className="fas fa-id-card me-2" style={{width: '20px'}}></i> Tipos Doc.</a></li>
                 </ul>
             </div>
+
+            {/* User Profile & Logout Sticky Footer */}
+            <div className="mt-auto bg-black bg-opacity-10 p-3 border-top border-white border-opacity-10">
+                {currentUser && (
+                    <div className="d-flex align-items-center mb-2">
+                        <div className="bg-white text-primary rounded-circle d-flex align-items-center justify-content-center me-2" style={{width: '35px', height: '35px'}}>
+                            <span className="fw-bold">{currentUser.nombre.charAt(0)}</span>
+                        </div>
+                        <div className="overflow-hidden">
+                            <div className="fw-bold text-truncate" style={{fontSize: '0.9rem'}}>{currentUser.nombre} {currentUser.apellido}</div>
+                            <div className="small text-white-50 text-truncate">{userRoleName}</div>
+                        </div>
+                    </div>
+                )}
+                <button className="btn btn-sm btn-danger w-100 bg-opacity-75 border-0" onClick={onLogout}>
+                    <i className="fas fa-sign-out-alt me-2"></i>Cerrar Sesión
+                </button>
+            </div>
         </div>
     );
 };
@@ -208,7 +330,10 @@ const Sidebar = ({ activeTab, setActiveTab, isOpen, toggleSidebar }: any) => {
 // --- MAIN APP ---
 
 const App = () => {
-  const [activeTab, setActiveTab] = useState('pos');
+  // Estado de Sesión (Autenticación)
+  const [currentUser, setCurrentUser] = useState<Usuario | null>(null);
+
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setSidebarOpen] = useState(false);
 
   // Global State - Original
@@ -227,6 +352,18 @@ const App = () => {
   const [subcategories, setSubcategories] = useState<Subcategoria[]>(SUBCATEGORIAS_INIT);
   const [users, setUsers] = useState<Usuario[]>(USUARIOS_INIT);
 
+  const handleLoginSuccess = (user: Usuario) => {
+      setCurrentUser(user);
+      setActiveTab('dashboard'); // Al ingresar, ir al dashboard
+  };
+
+  const handleLogout = () => {
+      if(confirm("¿Está seguro que desea cerrar sesión?")) {
+          setCurrentUser(null); // Esto limpiará el usuario y React renderizará <LoginScreen />
+          setSidebarOpen(false);
+      }
+  };
+
   const handleConfirmPurchase = (newBatches: Lote[]) => {
       const nextIdStart = lotes.length > 0 ? Math.max(...lotes.map(l => l.id_lote), 0) + 1 : 1;
       const batchesWithIds = newBatches.map((b, idx) => ({ ...b, id_lote: nextIdStart + idx }));
@@ -235,11 +372,24 @@ const App = () => {
 
   const toggleSidebar = () => setSidebarOpen(!isSidebarOpen);
 
+  // --- RENDER CONDICIONAL ---
+  if (!currentUser) {
+      return <LoginScreen users={users} onLoginSuccess={handleLoginSuccess} />;
+  }
+
   return (
     <div className="app-container">
         <div className={`sidebar-overlay ${isSidebarOpen ? 'show' : ''}`} onClick={() => setSidebarOpen(false)}></div>
 
-        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
+        <Sidebar 
+            activeTab={activeTab} 
+            setActiveTab={setActiveTab} 
+            isOpen={isSidebarOpen} 
+            toggleSidebar={toggleSidebar} 
+            currentUser={currentUser}
+            roles={roles}
+            onLogout={handleLogout}
+        />
         
         <div className="main-content">
             <div className="d-lg-none bg-white shadow-sm p-2 d-flex align-items-center justify-content-between sticky-top" style={{zIndex: 1020}}>
@@ -247,7 +397,9 @@ const App = () => {
                     <i className="fas fa-bars fa-lg"></i>
                 </button>
                 <span className="fw-bold text-primary">FAST POS</span>
-                <div style={{width: '40px'}}></div>
+                <div className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center small" style={{width: '30px', height: '30px'}}>
+                    {currentUser.nombre.charAt(0)}
+                </div>
             </div>
 
             <div className="flex-grow-1" style={{ backgroundColor: '#f8f9fc' }}>
@@ -272,8 +424,7 @@ const App = () => {
                     />
                 }
 
-                {/* --- CRUDs INDIVIDUALES (Desagregados) --- */}
-
+                {/* --- CRUD Views Existentes --- */}
                 {activeTab === 'clientes' && <CrudModule title="Clientes" icon="fa-users" data={clients} setData={setClients} idField="id_cliente" 
                     columns={[{header:'Nombre', accessor:'nombre'}, {header:'Doc', accessor:'nro_documento'}, {header:'Celular', accessor:'celular'}]} 
                     fields={[{name:'nombre', label:'Nombre', type:'text'}, {name:'nro_documento', label:'DNI', type:'text'}, {name:'celular', label:'Cel', type:'text'}]} 
@@ -300,6 +451,8 @@ const App = () => {
                         {name: 'precio_referencia', label: 'Precio Venta Ref.', type: 'number'}
                     ]}
                 />}
+
+                {/* --- Módulos Maestros Desagregados --- */}
 
                 {activeTab === 'categorias' && <CrudModule title="Categorías" icon="fa-layer-group" data={categories} setData={setCategories} idField="id_categoria"
                     columns={[{header: 'Nombre', accessor: 'nombre'}]}

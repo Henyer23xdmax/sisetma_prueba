@@ -78,6 +78,6 @@ export const SUBCATEGORIAS_INIT: Subcategoria[] = [
 ];
 
 export const USUARIOS_INIT: Usuario[] = [
-    { id_usuario: 1, nombre: 'Admin', apellido: 'General', nombre_usuario: 'admin', id_rol: 1, correo: 'admin@sistema.com' },
-    { id_usuario: 2, nombre: 'Juan', apellido: 'Vendedor', nombre_usuario: 'vendedor', id_rol: 2, correo: 'vendedor@sistema.com' },
+    { id_usuario: 1, nombre: 'Admin', apellido: 'General', nombre_usuario: 'admin', password: 'admin', id_rol: 1, correo: 'admin@sistema.com' },
+    { id_usuario: 2, nombre: 'Juan', apellido: 'Vendedor', nombre_usuario: 'vendedor', password: '123', id_rol: 2, correo: 'vendedor@sistema.com' },
 ];
