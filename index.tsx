@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Producto, Categoria, Marca, UnidadMedida, Presentacion, Lote, Cliente, Proveedor, Rol, TipoDocumento, Subcategoria, Usuario } from './types';
 import { 
@@ -8,15 +7,14 @@ import {
     ROLES_INIT, TIPO_DOC_INIT, SUBCATEGORIAS_INIT, USUARIOS_INIT
 } from './data';
 
-// Import Pages & Components
 import POS from './pages/POS';
 import Compras from './pages/Compras';
 import GenericTable from './components/GenericTable';
 import GenericModal from './components/GenericModal';
 
-// --- COMPONENTES AUXILIARES ---
+const API_URL = 'http://localhost:8080/api';
 
-// 1. LOGIN SCREEN COMPONENT
+// --- 1. PANTALLA DE LOGIN (Local por ahora) ---
 const LoginScreen = ({ users, onLoginSuccess }: { users: Usuario[], onLoginSuccess: (user: Usuario) => void }) => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
@@ -24,380 +22,43 @@ const LoginScreen = ({ users, onLoginSuccess }: { users: Usuario[], onLoginSucce
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
-        setError('');
+        // Aquí podrías conectar con un endpoint real /api/login si lo creas
+        const userFound = users.find(u => u.nombre_usuario === username.trim() && u.password === password.trim());
         
-        const userClean = username.trim();
-        const passClean = password.trim();
-
-        console.log("Intentando ingresar con:", userClean, passClean);
-        
-        let userFound = users.find(u => u.nombre_usuario === userClean && u.password === passClean);
-
-        if (!userFound && userClean === 'admin' && passClean === 'admin') {
-            console.log("Usando acceso de respaldo admin.");
-            userFound = users.find(u => u.nombre_usuario === 'admin') || {
-                id_usuario: 1, nombre: 'Admin', apellido: 'Sistema', nombre_usuario: 'admin', id_rol: 1, password: 'admin'
-            };
+        if (!userFound && username === 'admin' && password === 'admin') {
+            onLoginSuccess({ id_usuario: 1, nombre: 'Admin', apellido: 'Sistema', nombre_usuario: 'admin', id_rol: 1, password: 'admin' });
+            return;
         }
-
-        if (userFound) {
-            onLoginSuccess(userFound);
-        } else {
-            setError('Credenciales incorrectas. Intente: admin / admin');
-        }
+        if (userFound) onLoginSuccess(userFound);
+        else setError('Credenciales incorrectas.');
     };
 
     return (
-        <div className="d-flex align-items-center justify-content-center vh-100" 
-             style={{ background: 'linear-gradient(135deg, #4e73df 0%, #224abe 100%)' }}>
-            <div className="card border-0 shadow-lg" style={{ width: '100%', maxWidth: '400px', borderRadius: '1rem' }}>
+        <div className="d-flex align-items-center justify-content-center vh-100" style={{ background: 'linear-gradient(135deg, #4e73df 0%, #224abe 100%)' }}>
+            <div className="card border-0 shadow-lg" style={{ width: '100%', maxWidth: '400px' }}>
                 <div className="card-body p-5">
-                    <div className="text-center mb-4">
-                        <div className="bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" 
-                             style={{ width: '60px', height: '60px' }}>
-                            <i className="fas fa-bolt fa-2x"></i>
-                        </div>
-                        <h4 className="fw-bold text-gray-900">Bienvenido a FAST POS</h4>
-                        <p className="text-muted small">Ingrese sus credenciales para continuar</p>
-                    </div>
-
-                    {error && (
-                        <div className="alert alert-danger d-flex align-items-center small py-2" role="alert">
-                            <i className="fas fa-exclamation-circle me-2"></i> {error}
-                        </div>
-                    )}
-
+                    <h4 className="fw-bold text-center mb-4">FAST POS</h4>
+                    {error && <div className="alert alert-danger small">{error}</div>}
                     <form onSubmit={handleLogin}>
-                        <div className="mb-3">
-                            <label className="form-label small fw-bold text-secondary">Usuario</label>
-                            <div className="input-group">
-                                <span className="input-group-text bg-light border-end-0"><i className="fas fa-user text-muted"></i></span>
-                                <input 
-                                    type="text" 
-                                    className="form-control bg-light border-start-0" 
-                                    placeholder="Ej: admin"
-                                    value={username}
-                                    onChange={(e) => setUsername(e.target.value)}
-                                    autoComplete="username"
-                                    autoFocus
-                                />
-                            </div>
-                        </div>
-                        <div className="mb-4">
-                            <label className="form-label small fw-bold text-secondary">Contraseña</label>
-                            <div className="input-group">
-                                <span className="input-group-text bg-light border-end-0"><i className="fas fa-lock text-muted"></i></span>
-                                <input 
-                                    type="password" 
-                                    className="form-control bg-light border-start-0" 
-                                    placeholder="••••••"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    autoComplete="current-password"
-                                />
-                            </div>
-                        </div>
-                        <button type="submit" className="btn btn-primary w-100 py-2 fw-bold shadow-sm rounded-pill">
-                            INGRESAR
-                        </button>
+                        <div className="mb-3"><input className="form-control" placeholder="Usuario" value={username} onChange={e => setUsername(e.target.value)} autoFocus /></div>
+                        <div className="mb-3"><input type="password" className="form-control" placeholder="Contraseña" value={password} onChange={e => setPassword(e.target.value)} /></div>
+                        <button className="btn btn-primary w-100">INGRESAR</button>
                     </form>
-                    
-                    <div className="text-center mt-4">
-                        <small className="text-muted">Versión 2.8.0 &copy; 2025</small>
-                    </div>
                 </div>
             </div>
         </div>
     );
 };
 
-// 2. BACKEND CODE GENERATOR COMPONENT
-const BackendGenerator = () => {
-    const [activeFile, setActiveFile] = useState('pom');
-
-    const codes: any = {
-        pom: `<?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" ...>
-    <modelVersion>4.0.0</modelVersion>
-    <groupId>com.fastpos</groupId>
-    <artifactId>backend</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
-    <name>fastpos-backend</name>
-    <description>API REST para Sistema de Ventas</description>
-    
-    <parent>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.2.0</version>
-    </parent>
-
-    <properties>
-        <java.version>17</java.version>
-    </properties>
-
-    <dependencies>
-        <!-- Web & API -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-validation</artifactId>
-        </dependency>
-
-        <!-- Database -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-jpa</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.mysql</groupId>
-            <artifactId>mysql-connector-j</artifactId>
-            <scope>runtime</scope>
-        </dependency>
-
-        <!-- Utilities -->
-        <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <optional>true</optional>
-        </dependency>
-
-        <!-- Reports (Optional) -->
-        <dependency>
-            <groupId>net.sf.jasperreports</groupId>
-            <artifactId>jasperreports</artifactId>
-            <version>6.20.6</version>
-        </dependency>
-    </dependencies>
-</project>`,
-        props: `# Database Configuration
-spring.datasource.url=jdbc:mysql://localhost:3306/crudjavabd1?useSSL=false&serverTimezone=UTC
-spring.datasource.username=root
-spring.datasource.password=
-spring.jpa.hibernate.ddl-auto=update
-spring.jpa.show-sql=true
-spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQL8Dialect
-
-# File Upload
-spring.servlet.multipart.max-file-size=10MB
-spring.servlet.multipart.max-request-size=10MB`,
-        entities: `package com.fastpos.backend.entity;
-
-import jakarta.persistence.*;
-import lombok.Data;
-import java.util.Date;
-
-@Data
-@Entity
-@Table(name = "producto")
-public class Producto {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long idProducto;
-    private String nombre;
-    
-    @ManyToOne
-    @JoinColumn(name = "id_categoria")
-    private Categoria categoria;
-    
-    @ManyToOne
-    @JoinColumn(name = "id_marca")
-    private Marca marca;
-    
-    // ... otros campos (unidad, presentacion) ...
-    private Double precioReferencia;
-}
-
-@Data
-@Entity
-@Table(name = "lote")
-public class Lote {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long idLote;
-    
-    @Column(unique = true)
-    private String codigoLote;
-    
-    private Date fechaVencimiento;
-    private Integer cantidad;
-    private Double precioCompra;
-    private Double precioVenta;
-    
-    @ManyToOne
-    @JoinColumn(name = "id_producto")
-    private Producto producto;
-}
-
-@Data
-@Entity
-@Table(name = "comprobante") // Venta
-public class Venta {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long idComprobante;
-    
-    private String serie;
-    private Integer numero;
-    private Date fechaEmision;
-    private Double total;
-    
-    @ManyToOne
-    @JoinColumn(name = "id_cliente")
-    private Cliente cliente;
-    
-    @OneToMany(mappedBy = "venta", cascade = CascadeType.ALL)
-    private List<DetalleVenta> detalles;
-}`,
-        service: `package com.fastpos.backend.service;
-
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import java.util.List;
-
-@Service
-public class VentaService {
-
-    @Autowired private LoteRepository loteRepository;
-    @Autowired private VentaRepository ventaRepository;
-
-    @Transactional
-    public Venta realizarVenta(VentaDTO ventaDto) {
-        Venta venta = new Venta();
-        // ... setear cliente, fecha, etc ...
-        
-        for (DetalleDTO item : ventaDto.getItems()) {
-            // 1. Lógica FIFO: Obtener lotes con stock, ordenados por vencimiento (El más viejo primero)
-            List<Lote> lotes = loteRepository.findByProductoIdAndCantidadGreaterThanOrderByFechaVencimientoAsc(
-                item.getIdProducto(), 0
-            );
-            
-            int cantidadRequerida = item.getCantidad();
-            
-            for (Lote lote : lotes) {
-                if (cantidadRequerida <= 0) break;
-                
-                int disponible = lote.getCantidad();
-                int aTomar = Math.min(disponible, cantidadRequerida);
-                
-                // 2. Descontar stock
-                lote.setCantidad(disponible - aTomar);
-                loteRepository.save(lote);
-                
-                cantidadRequerida -= aTomar;
-                
-                // 3. Crear detalle de venta vinculado a este lote específico
-                DetalleVenta detalle = new DetalleVenta();
-                detalle.setProducto(lote.getProducto());
-                detalle.setCantidad(aTomar);
-                detalle.setPrecioUnitario(lote.getPrecioVenta());
-                detalle.setLote(lote); // Trazabilidad
-                venta.addDetalle(detalle);
-            }
-            
-            if (cantidadRequerida > 0) {
-                throw new RuntimeException("Stock insuficiente para producto ID: " + item.getIdProducto());
-            }
-        }
-        
-        return ventaRepository.save(venta);
-    }
-}`,
-        controller: `package com.fastpos.backend.controller;
-
-import org.springframework.web.bind.annotation.*;
-
-@RestController
-@RequestMapping("/api/ventas")
-@CrossOrigin(origins = "*") // Permitir React
-public class VentaController {
-
-    @Autowired
-    private VentaService ventaService;
-
-    @PostMapping
-    public ResponseEntity<?> crearVenta(@RequestBody VentaDTO ventaDto) {
-        try {
-            Venta nuevaVenta = ventaService.realizarVenta(ventaDto);
-            return ResponseEntity.ok(nuevaVenta);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
-    }
-    
-    @GetMapping
-    public List<Venta> listarVentas() {
-        return ventaService.findAll();
-    }
-}`
-    };
-
-    return (
-        <div className="container-fluid p-4">
-            <div className="d-flex align-items-center mb-4">
-                <div className="bg-warning text-dark rounded p-2 me-2"><i className="fas fa-code"></i></div>
-                <div>
-                    <h4 className="m-0 fw-bold text-gray-800">Generador de Backend Java</h4>
-                    <p className="text-muted small m-0">Código fuente Spring Boot 3 listo para copiar</p>
-                </div>
-            </div>
-
-            <div className="row">
-                <div className="col-md-3">
-                    <div className="list-group shadow-sm">
-                        <button className={`list-group-item list-group-item-action ${activeFile === 'pom' ? 'active' : ''}`} onClick={() => setActiveFile('pom')}>
-                            <i className="fab fa-java me-2"></i>pom.xml
-                        </button>
-                        <button className={`list-group-item list-group-item-action ${activeFile === 'props' ? 'active' : ''}`} onClick={() => setActiveFile('props')}>
-                            <i className="fas fa-cog me-2"></i>application.properties
-                        </button>
-                        <button className={`list-group-item list-group-item-action ${activeFile === 'entities' ? 'active' : ''}`} onClick={() => setActiveFile('entities')}>
-                            <i className="fas fa-database me-2"></i>Entidades (JPA)
-                        </button>
-                        <button className={`list-group-item list-group-item-action ${activeFile === 'service' ? 'active' : ''}`} onClick={() => setActiveFile('service')}>
-                            <i className="fas fa-cogs me-2"></i>Service (Lógica FIFO)
-                        </button>
-                        <button className={`list-group-item list-group-item-action ${activeFile === 'controller' ? 'active' : ''}`} onClick={() => setActiveFile('controller')}>
-                            <i className="fas fa-network-wired me-2"></i>Controller (REST)
-                        </button>
-                    </div>
-                </div>
-                <div className="col-md-9">
-                    <div className="card shadow border-0">
-                        <div className="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-                            <span className="small font-monospace">{activeFile === 'entities' ? 'Entities.java' : activeFile + (activeFile === 'pom' ? '.xml' : '.java')}</span>
-                            <button className="btn btn-sm btn-outline-light" onClick={() => navigator.clipboard.writeText(codes[activeFile])}>
-                                <i className="fas fa-copy me-1"></i> Copiar
-                            </button>
-                        </div>
-                        <div className="card-body bg-dark p-0">
-                            <textarea 
-                                className="form-control bg-dark text-white border-0 font-monospace p-3" 
-                                style={{ height: '500px', resize: 'none', fontSize: '0.85rem' }}
-                                readOnly 
-                                value={codes[activeFile]}
-                            />
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-// CrudModule actualizado para soportar select
-const CrudModule = ({ title, icon, data, setData, idField, columns, fields }: any) => {
+// --- 2. CRUD MODULE INTELIGENTE (Conecta con API) ---
+const CrudModule = ({ title, icon, data, onSave, onDelete, idField, columns, fields }: any) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [currentItem, setCurrentItem] = useState<any>(null);
     const [formData, setFormData] = useState<any>({});
 
     const handleAddNew = () => {
         const initialData: any = {};
-        if(fields) {
-            fields.forEach((f:any) => initialData[f.name] = '');
-        }
+        if(fields) fields.forEach((f:any) => initialData[f.name] = '');
         setFormData(initialData);
         setCurrentItem(null);
         setIsModalOpen(true);
@@ -409,54 +70,34 @@ const CrudModule = ({ title, icon, data, setData, idField, columns, fields }: an
         setIsModalOpen(true);
     };
 
-    const handleDelete = (item: any) => {
-        if (confirm(`¿Eliminar registro?`)) {
-            setData(data.filter((d:any) => d[idField] !== item[idField]));
-        }
+    const handleDeleteClick = (item: any) => {
+        if (confirm(`¿Eliminar registro?`)) onDelete(item);
     };
 
-    const handleSave = () => {
-        if (currentItem) {
-            setData(data.map((d:any) => d[idField] === currentItem[idField] ? { ...formData, [idField]: currentItem[idField] } : d));
-        } else {
-            const newId = data.length > 0 ? Math.max(...data.map((d:any) => d[idField])) + 1 : 1;
-            setData([...data, { ...formData, [idField]: newId }]);
-        }
+    const handleSaveClick = () => {
+        onSave(formData, currentItem ? currentItem[idField] : null);
         setIsModalOpen(false);
     };
 
     return (
-        <div className="container-fluid p-3 p-md-4">
-             <div className="d-flex align-items-center justify-content-between mb-4">
-                <h3 className="h3 mb-0 text-gray-800 fw-bold fs-4 fs-md-3"><i className={`fas ${icon} me-2 text-primary`}></i>{title}</h3>
-                <button className="btn btn-primary shadow-sm rounded-pill px-3 px-md-4" onClick={handleAddNew}>
-                    <i className="fas fa-plus me-2"></i><span className="d-none d-sm-inline">Nuevo</span>
-                </button>
+        <div className="container-fluid p-4">
+             <div className="d-flex justify-content-between mb-4">
+                <h3 className="fw-bold"><i className={`fas ${icon} me-2 text-primary`}></i>{title}</h3>
+                <button className="btn btn-primary rounded-pill" onClick={handleAddNew}><i className="fas fa-plus me-2"></i>Nuevo</button>
             </div>
-            <GenericTable columns={columns} data={data} keyField={idField} onEdit={handleEdit} onDelete={handleDelete} />
-            <GenericModal title={currentItem ? `Editar` : `Nuevo`} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={handleSave}>
+            <GenericTable columns={columns} data={data} keyField={idField} onEdit={handleEdit} onDelete={handleDeleteClick} />
+            <GenericModal title={currentItem ? `Editar` : `Nuevo`} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={handleSaveClick}>
                 <form>
                     {fields && fields.map((field:any) => (
                         <div className="mb-3" key={field.name}>
-                            <label className="form-label fw-bold small text-secondary">{field.label} {field.required && '*'}</label>
+                            <label className="form-label small fw-bold">{field.label}</label>
                             {field.type === 'select' ? (
-                                <select 
-                                    className="form-select" 
-                                    value={formData[field.name] || ''} 
-                                    onChange={e => setFormData({...formData, [field.name]: Number(e.target.value)})}
-                                >
+                                <select className="form-select" value={formData[field.name] || ''} onChange={e => setFormData({...formData, [field.name]: Number(e.target.value)})}>
                                     <option value="">Seleccione...</option>
-                                    {field.options?.map((opt:any) => (
-                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                    ))}
+                                    {field.options?.map((opt:any) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                                 </select>
                             ) : (
-                                <input 
-                                    type={field.type} 
-                                    className="form-control" 
-                                    value={formData[field.name] || ''} 
-                                    onChange={e => setFormData({...formData, [field.name]: e.target.value})} 
-                                />
+                                <input type={field.type} className="form-control" value={formData[field.name] || ''} onChange={e => setFormData({...formData, [field.name]: e.target.value})} />
                             )}
                         </div>
                     ))}
@@ -466,328 +107,234 @@ const CrudModule = ({ title, icon, data, setData, idField, columns, fields }: an
     );
 };
 
+// --- 3. DASHBOARD ---
 const Dashboard = ({ lotes, products }: any) => {
-  const safeLotes = lotes || [];
-  const stockTotal = safeLotes.reduce((acc:number, l:any) => acc + l.cantidad, 0);
-  const valorTotal = safeLotes.reduce((acc:number, l:any) => acc + (l.cantidad * l.precio_compra), 0);
+  const stockTotal = (lotes || []).reduce((acc:number, l:any) => acc + (l.cantidad || 0), 0);
+  // Calculo aproximado si precioCompra existe, sino 0
+  const valorTotal = (lotes || []).reduce((acc:number, l:any) => acc + ((l.cantidad || 0) * (l.precio_compra || 0)), 0);
   
   return (
-    <div className="container-fluid p-3 p-md-4">
-      <h3 className="text-gray-800 fw-bold mb-4">Dashboard General</h3>
-      <div className="row g-3 g-md-4">
-        <div className="col-12 col-md-4">
-          <div className="card border-0 shadow-sm h-100 py-2 border-start border-primary border-4">
-            <div className="card-body d-flex align-items-center justify-content-between">
-                <div>
-                    <div className="text-uppercase text-primary fw-bold text-xs mb-1">Productos</div>
-                    <div className="h3 mb-0 fw-bold text-gray-800">{products ? products.length : 0}</div>
-                </div>
-                <i className="fas fa-box fa-2x text-gray-300 opacity-25"></i>
-            </div>
-          </div>
-        </div>
-        <div className="col-12 col-md-4">
-          <div className="card border-0 shadow-sm h-100 py-2 border-start border-success border-4">
-            <div className="card-body d-flex align-items-center justify-content-between">
-                <div>
-                    <div className="text-uppercase text-success fw-bold text-xs mb-1">Stock (Und)</div>
-                    <div className="h3 mb-0 fw-bold text-gray-800">{stockTotal}</div>
-                </div>
-                <i className="fas fa-cubes fa-2x text-gray-300 opacity-25"></i>
-            </div>
-          </div>
-        </div>
-        <div className="col-12 col-md-4">
-          <div className="card border-0 shadow-sm h-100 py-2 border-start border-info border-4">
-            <div className="card-body d-flex align-items-center justify-content-between">
-                <div>
-                    <div className="text-uppercase text-info fw-bold text-xs mb-1">Valorización</div>
-                    <div className="h3 mb-0 fw-bold text-gray-800">S/. {valorTotal.toFixed(2)}</div>
-                </div>
-                <i className="fas fa-dollar-sign fa-2x text-gray-300 opacity-25"></i>
-            </div>
-          </div>
-        </div>
+    <div className="container-fluid p-4">
+      <h3 className="fw-bold mb-4">Dashboard General</h3>
+      <div className="row g-4">
+        <div className="col-md-4"><div className="card shadow-sm border-start border-primary border-4 py-2"><div className="card-body"><div className="text-primary fw-bold small">PRODUCTOS</div><div className="h3 fw-bold text-gray-800">{products.length}</div></div></div></div>
+        <div className="col-md-4"><div className="card shadow-sm border-start border-success border-4 py-2"><div className="card-body"><div className="text-success fw-bold small">STOCK TOTAL</div><div className="h3 fw-bold text-gray-800">{stockTotal}</div></div></div></div>
+        <div className="col-md-4"><div className="card shadow-sm border-start border-info border-4 py-2"><div className="card-body"><div className="text-info fw-bold small">VALORIZACIÓN</div><div className="h3 fw-bold text-gray-800">S/. {valorTotal.toFixed(2)}</div></div></div></div>
       </div>
     </div>
   );
 };
 
-const Sidebar = ({ activeTab, setActiveTab, isOpen, toggleSidebar, currentUser, roles, onLogout }: any) => {
-    const handleNav = (e: React.MouseEvent, tab: string) => {
-        e.preventDefault();
-        setActiveTab(tab);
-        if (window.innerWidth <= 992) {
-            toggleSidebar();
-        }
-    };
-
-    const userRoleName = roles.find((r:Rol) => r.id_rol === currentUser?.id_rol)?.nombre || 'Usuario';
-
+// --- 4. SIDEBAR ---
+const Sidebar = ({ activeTab, setActiveTab, isOpen, toggleSidebar, currentUser, onLogout }: any) => {
+    const handleNav = (e: any, tab: string) => { e.preventDefault(); setActiveTab(tab); if(window.innerWidth < 992) toggleSidebar(); };
     return (
-        <div className={`sidebar ${isOpen ? 'show' : ''} d-flex flex-column flex-shrink-0 text-white`}>
-            {/* Header */}
-            <div className="p-3">
-                <div className="d-flex align-items-center justify-content-between text-white text-decoration-none">
-                    <span className="fs-4 fw-bold d-flex align-items-center">
-                        <i className="fas fa-bolt text-warning me-2"></i>FAST POS
-                    </span>
-                    <button className="btn text-white d-lg-none" onClick={toggleSidebar}>
-                        <i className="fas fa-times"></i>
-                    </button>
-                </div>
-                <hr className="mt-3 mb-0" />
-            </div>
-
-            {/* Scroll Area for Sidebar Links */}
-            <div className="sidebar-scroll-area px-1 pb-3">
-                <ul className="nav nav-pills flex-column mb-auto">
-                    <li className="nav-item">
-                        <a href="#" className={`nav-link text-white ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={(e) => handleNav(e, 'dashboard')}>
-                            <i className="fas fa-tachometer-alt me-2" style={{width: '20px'}}></i> Dashboard
-                        </a>
-                    </li>
-                    
-                    <li className="nav-item mt-3 mb-1 text-uppercase text-white-50 small fw-bold ps-2">Operaciones</li>
-                    <li>
-                        <a href="#" className={`nav-link text-white ${activeTab === 'pos' ? 'active bg-success' : ''}`} onClick={(e) => handleNav(e, 'pos')}>
-                            <i className="fas fa-cash-register me-2" style={{width: '20px'}}></i> Punto de Venta
-                        </a>
-                    </li>
-                    <li>
-                        <a href="#" className={`nav-link text-white ${activeTab === 'compras' ? 'active bg-primary' : ''}`} onClick={(e) => handleNav(e, 'compras')}>
-                            <i className="fas fa-shopping-bag me-2" style={{width: '20px'}}></i> Compras
-                        </a>
-                    </li>
-                    
-                    <li className="nav-item mt-3 mb-1 text-uppercase text-white-50 small fw-bold ps-2">Inventario</li>
-                    <li><a href="#" className={`nav-link text-white ${activeTab === 'productos' ? 'active' : ''}`} onClick={(e) => handleNav(e, 'productos')}><i className="fas fa-box me-2" style={{width: '20px'}}></i> Productos</a></li>
-                    <li><a href="#" className={`nav-link text-white ${activeTab === 'categorias' ? 'active' : ''}`} onClick={(e) => handleNav(e, 'categorias')}><i className="fas fa-layer-group me-2" style={{width: '20px'}}></i> Categorías</a></li>
-                    <li><a href="#" className={`nav-link text-white ${activeTab === 'subcategorias' ? 'active' : ''}`} onClick={(e) => handleNav(e, 'subcategorias')}><i className="fas fa-tags me-2" style={{width: '20px'}}></i> Subcategorías</a></li>
-                    <li><a href="#" className={`nav-link text-white ${activeTab === 'marcas' ? 'active' : ''}`} onClick={(e) => handleNav(e, 'marcas')}><i className="fas fa-copyright me-2" style={{width: '20px'}}></i> Marcas</a></li>
-                    <li><a href="#" className={`nav-link text-white ${activeTab === 'unidades' ? 'active' : ''}`} onClick={(e) => handleNav(e, 'unidades')}><i className="fas fa-ruler-combined me-2" style={{width: '20px'}}></i> Unidades</a></li>
-                    <li><a href="#" className={`nav-link text-white ${activeTab === 'presentaciones' ? 'active' : ''}`} onClick={(e) => handleNav(e, 'presentaciones')}><i className="fas fa-wine-bottle me-2" style={{width: '20px'}}></i> Presentaciones</a></li>
-                    
-                    <li className="nav-item mt-3 mb-1 text-uppercase text-white-50 small fw-bold ps-2">Directorios</li>
-                    <li><a href="#" className={`nav-link text-white ${activeTab === 'clientes' ? 'active' : ''}`} onClick={(e) => handleNav(e, 'clientes')}><i className="fas fa-users me-2" style={{width: '20px'}}></i> Clientes</a></li>
-                    <li><a href="#" className={`nav-link text-white ${activeTab === 'proveedores' ? 'active' : ''}`} onClick={(e) => handleNav(e, 'proveedores')}><i className="fas fa-truck me-2" style={{width: '20px'}}></i> Proveedores</a></li>
-                    
-                    <li className="nav-item mt-3 mb-1 text-uppercase text-white-50 small fw-bold ps-2">Sistema</li>
-                    <li><a href="#" className={`nav-link text-white ${activeTab === 'usuarios' ? 'active' : ''}`} onClick={(e) => handleNav(e, 'usuarios')}><i className="fas fa-user-shield me-2" style={{width: '20px'}}></i> Usuarios</a></li>
-                    <li><a href="#" className={`nav-link text-white ${activeTab === 'roles' ? 'active' : ''}`} onClick={(e) => handleNav(e, 'roles')}><i className="fas fa-key me-2" style={{width: '20px'}}></i> Roles</a></li>
-                    <li><a href="#" className={`nav-link text-white ${activeTab === 'tipos_doc' ? 'active' : ''}`} onClick={(e) => handleNav(e, 'tipos_doc')}><i className="fas fa-id-card me-2" style={{width: '20px'}}></i> Tipos Doc.</a></li>
-                    
-                    <li className="nav-item mt-3 mb-1 text-uppercase text-white-50 small fw-bold ps-2">Desarrollo</li>
-                    <li><a href="#" className={`nav-link text-white ${activeTab === 'backend_gen' ? 'active text-warning' : ''}`} onClick={(e) => handleNav(e, 'backend_gen')}><i className="fas fa-code me-2" style={{width: '20px'}}></i> Código Backend</a></li>
+        <div className={`sidebar ${isOpen ? 'show' : ''} d-flex flex-column flex-shrink-0 text-white`} 
+             style={{ position: 'fixed', top: 0, left: 0, height: '100vh', width: '250px', zIndex: 1040, background: 'linear-gradient(180deg, #4e73df 10%, #224abe 100%)' }}>
+            <div className="p-3"><span className="fs-4 fw-bold"><i className="fas fa-bolt text-warning me-2"></i>FAST POS</span></div>
+            <div style={{ overflowY: 'auto', flexGrow: 1 }}>
+                <ul className="nav nav-pills flex-column p-2">
+                    <li className="nav-item"><a href="#" className={`nav-link text-white ${activeTab==='dashboard'?'active':''}`} onClick={(e)=>handleNav(e,'dashboard')}><i className="fas fa-tachometer-alt me-2"></i> Dashboard</a></li>
+                    <li className="nav-item mt-3 small fw-bold ps-2 text-white-50">OPERACIONES</li>
+                    <li><a href="#" className={`nav-link text-white ${activeTab==='pos'?'active':''}`} onClick={(e)=>handleNav(e,'pos')}><i className="fas fa-cash-register me-2"></i> Venta</a></li>
+                    <li><a href="#" className={`nav-link text-white ${activeTab==='compras'?'active':''}`} onClick={(e)=>handleNav(e,'compras')}><i className="fas fa-shopping-bag me-2"></i> Compras</a></li>
+                    <li className="nav-item mt-3 small fw-bold ps-2 text-white-50">MANTENIMIENTO</li>
+                    {['productos','categorias','marcas','unidades','presentaciones','clientes','proveedores'].map(m => (
+                        <li key={m}><a href="#" className={`nav-link text-white ${activeTab===m?'active':''}`} onClick={(e)=>handleNav(e,m)}><i className="fas fa-circle me-2 small"></i> {m.charAt(0).toUpperCase() + m.slice(1)}</a></li>
+                    ))}
                 </ul>
             </div>
-
-            {/* User Profile & Logout Sticky Footer */}
-            <div className="mt-auto bg-black bg-opacity-10 p-3 border-top border-white border-opacity-10">
-                {currentUser && (
-                    <div className="d-flex align-items-center mb-2">
-                        <div className="bg-white text-primary rounded-circle d-flex align-items-center justify-content-center me-2" style={{width: '35px', height: '35px'}}>
-                            <span className="fw-bold">{currentUser.nombre.charAt(0)}</span>
-                        </div>
-                        <div className="overflow-hidden">
-                            <div className="fw-bold text-truncate" style={{fontSize: '0.9rem'}}>{currentUser.nombre} {currentUser.apellido}</div>
-                            <div className="small text-white-50 text-truncate">{userRoleName}</div>
-                        </div>
-                    </div>
-                )}
-                <button className="btn btn-sm btn-danger w-100 bg-opacity-75 border-0" onClick={onLogout}>
-                    <i className="fas fa-sign-out-alt me-2"></i>Cerrar Sesión
-                </button>
+            <div className="p-3 bg-black bg-opacity-25 border-top border-white border-opacity-10">
+                <div className="d-flex align-items-center mb-2">
+                    <div className="bg-white text-primary rounded-circle d-flex center me-2" style={{width:30,height:30}}><span className="fw-bold ps-2">{currentUser?.nombre.charAt(0)}</span></div>
+                    <small>{currentUser?.nombre}</small>
+                </div>
+                <button className="btn btn-sm btn-danger w-100" onClick={onLogout}>Salir</button>
             </div>
         </div>
     );
 };
 
-// --- MAIN APP ---
-
+// --- 5. APP PRINCIPAL (LOGICA DE CONEXION) ---
 const App = () => {
-  // Estado de Sesión (Autenticación)
   const [currentUser, setCurrentUser] = useState<Usuario | null>(null);
-
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setSidebarOpen] = useState(false);
 
-  // Global State - Original
-  const [products, setProducts] = useState<Producto[]>(PRODUCTOS_INIT);
-  const [categories, setCategories] = useState<Categoria[]>(CATEGORIAS_INIT);
-  const [brands, setBrands] = useState<Marca[]>(MARCAS_INIT);
-  const [units, setUnits] = useState<UnidadMedida[]>(UNIDADES_INIT);
-  const [presentations, setPresentations] = useState<Presentacion[]>(PRESENTACIONES_INIT);
-  const [lotes, setLotes] = useState<Lote[]>(LOTES_INIT);
-  const [clients, setClients] = useState<Cliente[]>(CLIENTES_INIT);
-  const [suppliers, setSuppliers] = useState<Proveedor[]>(PROVEEDORES_INIT);
+  // --- ESTADOS DE DATOS ---
+  const [products, setProducts] = useState<Producto[]>([]);
+  const [categories, setCategories] = useState<Categoria[]>([]);
+  const [brands, setBrands] = useState<Marca[]>([]);
+  const [units, setUnits] = useState<UnidadMedida[]>([]);
+  const [presentations, setPresentations] = useState<Presentacion[]>([]);
+  const [clients, setClients] = useState<Cliente[]>([]);
+  const [suppliers, setSuppliers] = useState<Proveedor[]>([]);
+  const [lotes, setLotes] = useState<Lote[]>([]); // Lotes también vendrán de API
 
-  // Global State - Nuevos Módulos
-  const [roles, setRoles] = useState<Rol[]>(ROLES_INIT);
-  const [tipoDocs, setTipoDocs] = useState<TipoDocumento[]>(TIPO_DOC_INIT);
-  const [subcategories, setSubcategories] = useState<Subcategoria[]>(SUBCATEGORIAS_INIT);
-  const [users, setUsers] = useState<Usuario[]>(USUARIOS_INIT);
+  // --- CARGA INICIAL DE DATOS ---
+  const fetchAllData = async () => {
+    try {
+        // 1. Carga de Catálogos Simples
+        const [cats, mrcs, unds, pres, clis, provs] = await Promise.all([
+            fetch(`${API_URL}/categorias`).then(r => r.json()),
+            fetch(`${API_URL}/marcas`).then(r => r.json()),
+            fetch(`${API_URL}/unidades-medida`).then(r => r.json()), // Ojo con el endpoint
+            fetch(`${API_URL}/presentaciones`).then(r => r.json()),
+            fetch(`${API_URL}/clientes`).then(r => r.json()),
+            // fetch(`${API_URL}/proveedores`).then(r => r.json()) // Si no existe aun, usar mock
+            Promise.resolve(PROVEEDORES_INIT) 
+        ]);
 
-  const handleLoginSuccess = (user: Usuario) => {
-      setCurrentUser(user);
-      setActiveTab('dashboard'); // Al ingresar, ir al dashboard
+        // Mapear Clientes (Java a React)
+        const mappedClients = clis.map((c: any) => ({
+            id_cliente: c.idCliente, nombre: c.nombre, apellidos: c.apellidos, 
+            nro_documento: c.nroDocumento, direccion: c.direccion, celular: c.celular
+        }));
+
+        // 2. Carga de Productos (Compleja)
+        const prodsRaw = await fetch(`${API_URL}/productos`).then(r => r.json());
+        const mappedProds = prodsRaw.map((p: any) => ({
+            id_producto: p.idProducto,
+            nombre: p.nombre,
+            id_categoria: p.categoria?.idCategoria || 0,
+            id_marca: p.marca?.idMarca || 0,
+            id_unidad: p.unidadMedida?.idUnidad || 0,
+            id_presentacion: p.presentacion?.idPresentacion || 0,
+            precio_referencia: 0 // Se calculará
+        }));
+
+        // 3. Carga de Lotes (Inventario)
+        const lotesRaw = await fetch(`${API_URL}/lotes`).then(r => r.json());
+        const mappedLotes = lotesRaw.map((l: any) => ({
+            id_lote: l.idLote,
+            id_producto: l.producto?.idProducto,
+            codigo_lote: l.codigoLote,
+            precio_compra: l.precioCompra,
+            precio_venta: l.precioVenta,
+            fecha_vencimiento: l.fechaVencimiento,
+            cantidad: l.cantidad
+        }));
+
+        setCategories(cats.map((c:any) => ({ id_categoria: c.idCategoria, nombre: c.nombre })));
+        setBrands(mrcs.map((m:any) => ({ id_marca: m.idMarca, nombre: m.nombre, descripcion: m.descripcion })));
+        setUnits(unds.map((u:any) => ({ id_unidad: u.idUnidad, nombre: u.nombre, abreviatura: u.abreviatura })));
+        setPresentations(pres.map((p:any) => ({ id_presentacion: p.idPresentacion, nombre: p.nombre, descripcion: p.descripcion })));
+        setClients(mappedClients);
+        setSuppliers(provs); // Si usas mock, asegurar estructura
+        setProducts(mappedProds);
+        setLotes(mappedLotes);
+
+    } catch (error) {
+        console.error("Error cargando datos del backend:", error);
+        // Si falla, no hacemos nada (o podrías cargar mocks)
+    }
   };
 
-  const handleLogout = () => {
-      if(confirm("¿Está seguro que desea cerrar sesión?")) {
-          setCurrentUser(null); // Esto limpiará el usuario y React renderizará <LoginScreen />
-          setSidebarOpen(false);
-      }
+  useEffect(() => {
+      if (currentUser) fetchAllData();
+  }, [currentUser]);
+
+
+  // --- LÓGICA DE GUARDADO GENÉRICA (API) ---
+  const handleGenericSave = async (endpoint: string, data: any, id: number | null, idFieldJson: string) => {
+      const method = id ? 'PUT' : 'POST';
+      const url = id ? `${API_URL}/${endpoint}/${id}` : `${API_URL}/${endpoint}`;
+      
+      try {
+          const res = await fetch(url, {
+              method,
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(data)
+          });
+          if (res.ok) {
+              fetchAllData(); // Recargar todo para ver cambios
+          } else {
+              alert("Error al guardar en servidor");
+          }
+      } catch (e) { console.error(e); }
   };
 
-  const handleConfirmPurchase = (newBatches: Lote[]) => {
-      const nextIdStart = lotes.length > 0 ? Math.max(...lotes.map(l => l.id_lote), 0) + 1 : 1;
-      const batchesWithIds = newBatches.map((b, idx) => ({ ...b, id_lote: nextIdStart + idx }));
-      setLotes([...lotes, ...batchesWithIds]);
+  const handleGenericDelete = async (endpoint: string, id: number) => {
+      try {
+          await fetch(`${API_URL}/${endpoint}/${id}`, { method: 'DELETE' });
+          fetchAllData();
+      } catch (e) { console.error(e); }
   };
 
-  const toggleSidebar = () => setSidebarOpen(!isSidebarOpen);
+  // --- TRANSFORMADORES PARA GUARDAR (React -> Java) ---
+  
+  const saveProduct = (formData: any, id: number | null) => {
+      // Convertimos ids planos a objetos para Java
+      const payload = {
+          nombre: formData.nombre,
+          categoria: { idCategoria: formData.id_categoria },
+          marca: { idMarca: formData.id_marca },
+          unidadMedida: { idUnidad: formData.id_unidad },
+          presentacion: { idPresentacion: formData.id_presentacion },
+          estado: true
+      };
+      handleGenericSave('productos', payload, id, 'idProducto');
+  };
 
-  // --- RENDER CONDICIONAL ---
-  if (!currentUser) {
-      return <LoginScreen users={users} onLoginSuccess={handleLoginSuccess} />;
-  }
+  const saveClient = (formData: any, id: number | null) => {
+      const payload = {
+          nombre: formData.nombre, apellidos: formData.apellidos,
+          nroDocumento: formData.nro_documento, direccion: formData.direccion, celular: formData.celular, estado: true
+      };
+      handleGenericSave('clientes', payload, id, 'idCliente');
+  };
+
+  // Wrappers Simples
+  const saveCat = (d:any, id:any) => handleGenericSave('categorias', { nombre: d.nombre }, id, 'idCategoria');
+  const saveBrand = (d:any, id:any) => handleGenericSave('marcas', { nombre: d.nombre, descripcion: d.descripcion }, id, 'idMarca');
+  const saveUnit = (d:any, id:any) => handleGenericSave('unidades-medida', { nombre: d.nombre, abreviatura: d.abreviatura }, id, 'idUnidad');
+  const savePres = (d:any, id:any) => handleGenericSave('presentaciones', { nombre: d.nombre, descripcion: d.descripcion }, id, 'idPresentacion');
+
+  // --- VENTA (POS) & COMPRA ---
+  // Nota: Aquí la lógica transaccional compleja (FIFO) ya la hace el backend en /api/ventas.
+  // El frontend solo debe enviar el JSON de venta.
+  // Por ahora mantenemos la lógica visual, pero idealmente deberías llamar al endpoint POST /api/ventas
+
+  const handleLogout = () => { if(confirm("¿Salir?")) setCurrentUser(null); };
+
+  if (!currentUser) return <LoginScreen users={USUARIOS_INIT} onLoginSuccess={setCurrentUser} />;
 
   return (
     <div className="app-container">
         <div className={`sidebar-overlay ${isSidebarOpen ? 'show' : ''}`} onClick={() => setSidebarOpen(false)}></div>
-
-        <Sidebar 
-            activeTab={activeTab} 
-            setActiveTab={setActiveTab} 
-            isOpen={isSidebarOpen} 
-            toggleSidebar={toggleSidebar} 
-            currentUser={currentUser}
-            roles={roles}
-            onLogout={handleLogout}
-        />
+        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} isOpen={isSidebarOpen} toggleSidebar={() => setSidebarOpen(!isSidebarOpen)} currentUser={currentUser} onLogout={handleLogout} />
         
         <div className="main-content">
             <div className="d-lg-none bg-white shadow-sm p-2 d-flex align-items-center justify-content-between sticky-top" style={{zIndex: 1020}}>
-                <button className="btn btn-light text-primary" onClick={toggleSidebar}>
-                    <i className="fas fa-bars fa-lg"></i>
-                </button>
+                <button className="btn btn-light text-primary" onClick={() => setSidebarOpen(true)}><i className="fas fa-bars fa-lg"></i></button>
                 <span className="fw-bold text-primary">FAST POS</span>
-                <div className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center small" style={{width: '30px', height: '30px'}}>
-                    {currentUser.nombre.charAt(0)}
-                </div>
             </div>
 
             <div className="flex-grow-1" style={{ backgroundColor: '#f8f9fc' }}>
                 {activeTab === 'dashboard' && <Dashboard lotes={lotes} products={products} />}
                 
-                {activeTab === 'pos' && 
-                    <POS 
-                        products={products} 
-                        lotes={lotes} 
-                        setLotes={setLotes} 
-                        clients={clients} 
-                        categories={categories} 
-                        brands={brands} 
-                    />
-                }
-
-                {activeTab === 'compras' && 
-                    <Compras 
-                        products={products} 
-                        suppliers={suppliers} 
-                        onConfirmPurchase={handleConfirmPurchase} 
-                    />
-                }
+                {/* POS Y COMPRAS (Siguen usando estados locales por ahora para no romper la UI visual, pero le pasamos los datos reales de productos/lotes) */}
+                {activeTab === 'pos' && <POS products={products} lotes={lotes} setLotes={setLotes} clients={clients} categories={categories} brands={brands} />}
+                {activeTab === 'compras' && <Compras products={products} suppliers={suppliers} onConfirmPurchase={() => alert("Falta conectar endpoint POST /api/lotes")} />}
                 
-                {/* Módulo de Código Backend */}
-                {activeTab === 'backend_gen' && <BackendGenerator />}
-
-                {/* --- CRUD Views Existentes --- */}
-                {activeTab === 'clientes' && <CrudModule title="Clientes" icon="fa-users" data={clients} setData={setClients} idField="id_cliente" 
-                    columns={[{header:'Nombre', accessor:'nombre'}, {header:'Doc', accessor:'nro_documento'}, {header:'Celular', accessor:'celular'}]} 
-                    fields={[{name:'nombre', label:'Nombre', type:'text'}, {name:'nro_documento', label:'DNI', type:'text'}, {name:'celular', label:'Cel', type:'text'}]} 
+                {/* MANTENIMIENTOS CONECTADOS A API */}
+                {activeTab === 'productos' && <CrudModule title="Productos" icon="fa-box" data={products} onSave={saveProduct} onDelete={(d:any) => handleGenericDelete('productos', d.id_producto)} idField="id_producto" 
+                    columns={[{header:'Nombre', accessor:'nombre'}, {header:'Marca', accessor:(r:any)=>brands.find(b=>b.id_marca===r.id_marca)?.nombre||'-'}]}
+                    fields={[{name:'nombre', label:'Nombre', type:'text', required:true}, {name:'id_categoria', label:'Categoría', type:'select', options:categories.map(c=>({value:c.id_categoria, label:c.nombre}))}, {name:'id_marca', label:'Marca', type:'select', options:brands.map(b=>({value:b.id_marca, label:b.nombre}))}, {name:'id_unidad', label:'Unidad', type:'select', options:units.map(u=>({value:u.id_unidad, label:u.nombre}))}, {name:'id_presentacion', label:'Presentación', type:'select', options:presentations.map(p=>({value:p.id_presentacion, label:p.nombre}))}]} 
                 />}
 
-                {activeTab === 'proveedores' && <CrudModule title="Proveedores" icon="fa-truck" data={suppliers} setData={setSuppliers} idField="id_proveedor" 
-                    columns={[{header:'Razón Social', accessor:'razon_social'}, {header:'RUC', accessor:'ruc'}]} 
-                    fields={[{name:'razon_social', label:'Razón Social', type:'text'}, {name:'ruc', label:'RUC', type:'text'}]} 
+                {activeTab === 'clientes' && <CrudModule title="Clientes" icon="fa-users" data={clients} onSave={saveClient} onDelete={(d:any) => handleGenericDelete('clientes', d.id_cliente)} idField="id_cliente" 
+                    columns={[{header:'Nombre', accessor:'nombre'}, {header:'DNI', accessor:'nro_documento'}]} 
+                    fields={[{name:'nombre', label:'Nombre', type:'text'}, {name:'apellidos', label:'Apellidos', type:'text'}, {name:'nro_documento', label:'DNI', type:'text'}, {name:'direccion', label:'Dirección', type:'text'}, {name:'celular', label:'Celular', type:'text'}]} 
                 />}
 
-                {activeTab === 'productos' && <CrudModule title="Productos" icon="fa-box" data={products} setData={setProducts} idField="id_producto"
-                    columns={[
-                        {header: 'Nombre', accessor: 'nombre'}, 
-                        {header: 'Categoría', accessor: (row:any) => categories.find(c => c.id_categoria === row.id_categoria)?.nombre || '-'},
-                        {header: 'Marca', accessor: (row:any) => brands.find(m => m.id_marca === row.id_marca)?.nombre || '-'},
-                        {header: 'Ref. Precio', accessor: (row:any) => `S/. ${row.precio_referencia.toFixed(2)}`}
-                    ]}
-                    fields={[
-                        {name: 'nombre', label: 'Nombre Producto', type: 'text', required: true},
-                        {name: 'id_categoria', label: 'Categoría', type: 'select', options: categories.map(c => ({value: c.id_categoria, label: c.nombre}))},
-                        {name: 'id_marca', label: 'Marca', type: 'select', options: brands.map(b => ({value: b.id_marca, label: b.nombre}))},
-                        {name: 'id_unidad', label: 'Unidad', type: 'select', options: units.map(u => ({value: u.id_unidad, label: u.nombre}))},
-                        {name: 'id_presentacion', label: 'Presentación', type: 'select', options: presentations.map(p => ({value: p.id_presentacion, label: p.nombre}))},
-                        {name: 'precio_referencia', label: 'Precio Venta Ref.', type: 'number'}
-                    ]}
-                />}
-
-                {/* --- Módulos Maestros Desagregados --- */}
-
-                {activeTab === 'categorias' && <CrudModule title="Categorías" icon="fa-layer-group" data={categories} setData={setCategories} idField="id_categoria"
-                    columns={[{header: 'Nombre', accessor: 'nombre'}]}
-                    fields={[{name: 'nombre', label: 'Nombre Categoría', type: 'text'}]}
-                />}
-
-                {activeTab === 'subcategorias' && <CrudModule title="Subcategorías" icon="fa-tags" data={subcategories} setData={setSubcategories} idField="id_subcategoria"
-                    columns={[
-                        {header: 'Nombre', accessor: 'nombre'},
-                        {header: 'Categoría Padre', accessor: (row:any) => categories.find(c => c.id_categoria === row.id_categoria)?.nombre || '-'}
-                    ]}
-                    fields={[
-                        {name: 'nombre', label: 'Nombre Subcategoría', type: 'text'},
-                        {name: 'id_categoria', label: 'Categoría Padre', type: 'select', options: categories.map(c => ({value: c.id_categoria, label: c.nombre}))}
-                    ]}
-                />}
-
-                {activeTab === 'marcas' && <CrudModule title="Marcas" icon="fa-copyright" data={brands} setData={setBrands} idField="id_marca"
-                    columns={[{header:'Marca', accessor:'nombre'}, {header:'Desc', accessor:'descripcion'}]}
-                    fields={[{name:'nombre', label:'Nombre', type:'text'}, {name:'descripcion', label:'Descripción', type:'text'}]}
-                />}
-
-                {activeTab === 'unidades' && <CrudModule title="Unidades de Medida" icon="fa-ruler-combined" data={units} setData={setUnits} idField="id_unidad"
-                    columns={[{header:'Nombre', accessor:'nombre'}, {header:'Abrev.', accessor:'abreviatura'}]}
-                    fields={[{name:'nombre', label:'Nombre', type:'text'}, {name:'abreviatura', label:'Abreviatura (ej: KG)', type:'text'}]}
-                />}
-
-                {activeTab === 'presentaciones' && <CrudModule title="Presentaciones" icon="fa-wine-bottle" data={presentations} setData={setPresentations} idField="id_presentacion"
-                    columns={[{header:'Nombre', accessor:'nombre'}, {header:'Desc', accessor:'descripcion'}]}
-                    fields={[{name:'nombre', label:'Nombre', type:'text'}, {name:'descripcion', label:'Descripción', type:'text'}]}
-                />}
-
-                {activeTab === 'usuarios' && <CrudModule title="Usuarios" icon="fa-user-shield" data={users} setData={setUsers} idField="id_usuario"
-                    columns={[
-                        {header: 'Usuario', accessor: 'nombre_usuario'},
-                        {header: 'Nombre Completo', accessor: (row:any) => `${row.nombre} ${row.apellido}`},
-                        {header: 'Rol', accessor: (row:any) => roles.find(r => r.id_rol === row.id_rol)?.nombre || 'Desconocido'}
-                    ]}
-                    fields={[
-                        {name: 'nombre', label: 'Nombre', type: 'text'},
-                        {name: 'apellido', label: 'Apellido', type: 'text'},
-                        {name: 'nombre_usuario', label: 'Username', type: 'text'},
-                        {name: 'password', label: 'Contraseña', type: 'password'},
-                        {name: 'id_rol', label: 'Rol', type: 'select', options: roles.map(r => ({value: r.id_rol, label: r.nombre}))}
-                    ]}
-                />}
-
-                {activeTab === 'roles' && <CrudModule title="Roles" icon="fa-key" data={roles} setData={setRoles} idField="id_rol"
-                    columns={[{header:'Rol', accessor:'nombre'}, {header:'Desc', accessor:'descripcion'}]}
-                    fields={[{name:'nombre', label:'Nombre', type:'text'}, {name:'descripcion', label:'Descripción', type:'text'}]}
-                />}
+                {activeTab === 'categorias' && <CrudModule title="Categorías" icon="fa-layer-group" data={categories} onSave={saveCat} onDelete={(d:any) => handleGenericDelete('categorias', d.id_categoria)} idField="id_categoria" columns={[{header:'Nombre', accessor:'nombre'}]} fields={[{name:'nombre', label:'Nombre', type:'text'}]} />}
                 
-                {activeTab === 'tipos_doc' && <CrudModule title="Tipos Documento" icon="fa-id-card" data={tipoDocs} setData={setTipoDocs} idField="id_tipo_documento"
-                    columns={[{header:'Tipo', accessor:'nombre'}]}
-                    fields={[{name:'nombre', label:'Nombre', type:'text'}]}
-                />}
+                {activeTab === 'marcas' && <CrudModule title="Marcas" icon="fa-copyright" data={brands} onSave={saveBrand} onDelete={(d:any) => handleGenericDelete('marcas', d.id_marca)} idField="id_marca" columns={[{header:'Nombre', accessor:'nombre'}, {header:'Desc', accessor:'descripcion'}]} fields={[{name:'nombre', label:'Nombre', type:'text'}, {name:'descripcion', label:'Descripción', type:'text'}]} />}
+                
+                {activeTab === 'unidades' && <CrudModule title="Unidades" icon="fa-ruler" data={units} onSave={saveUnit} onDelete={(d:any) => handleGenericDelete('unidades-medida', d.id_unidad)} idField="id_unidad" columns={[{header:'Nombre', accessor:'nombre'}, {header:'Abrev', accessor:'abreviatura'}]} fields={[{name:'nombre', label:'Nombre', type:'text'}, {name:'abreviatura', label:'Abrev', type:'text'}]} />}
+                
+                {activeTab === 'presentaciones' && <CrudModule title="Presentaciones" icon="fa-wine-bottle" data={presentations} onSave={savePres} onDelete={(d:any) => handleGenericDelete('presentaciones', d.id_presentacion)} idField="id_presentacion" columns={[{header:'Nombre', accessor:'nombre'}]} fields={[{name:'nombre', label:'Nombre', type:'text'}, {name:'descripcion', label:'Desc', type:'text'}]} />}
 
             </div>
         </div>
