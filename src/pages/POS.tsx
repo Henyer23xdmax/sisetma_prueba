@@ -256,8 +256,8 @@ const POS: React.FC<POSProps> = ({ products, lotes, onSaleSuccess, clients, cate
                                                 <div className="small text-muted">Cod: {item.product.idProducto}</div>
                                             </td>
                                             <td className="text-center fw-bold">{item.quantity}</td>
-                                            <td className="text-end">{item.price.toFixed(2)}</td>
-                                            <td className="text-end fw-bold text-success">S/. {(item.price * item.quantity).toFixed(2)}</td>
+                                            <td className="text-end">{(item.price || 0).toFixed(2)}</td>
+                                            <td className="text-end fw-bold text-success">S/. {((item.price || 0) * item.quantity).toFixed(2)}</td>
                                             <td className="text-center">
                                                 <button className="btn btn-link text-danger btn-sm p-0" onClick={() => handleRemoveItem(item.product.idProducto)}>
                                                     <i className="fas fa-trash-alt"></i>
@@ -335,7 +335,7 @@ const POS: React.FC<POSProps> = ({ products, lotes, onSaleSuccess, clients, cate
                                     <div className={`fw-bold ${stock > 0 ? 'text-success' : 'text-danger'}`}>
                                         {stock > 0 ? `Stock: ${stock}` : 'AGOTADO'}
                                     </div>
-                                    <div className="small text-primary fw-bold">S/. {price.toFixed(2)}</div>
+                                    <div className="small text-primary fw-bold">S/. {(price || 0).toFixed(2)}</div>
                                 </div>
                             </button>
                         );

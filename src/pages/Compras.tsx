@@ -327,7 +327,7 @@ const Compras: React.FC<ComprasProps> = ({ products, suppliers, onPurchaseSucces
                         >
                             <div>
                                 <div className="fw-bold">{p.nombre}</div>
-                                <div className="small text-muted">Ref. Venta: S/. {p.precioReferencia.toFixed(2)}</div>
+                                <div className="small text-muted">Ref. Venta: S/. {(p.precioReferencia || 0).toFixed(2)}</div>
                             </div>
                             <i className="fas fa-chevron-right text-muted"></i>
                         </button>
