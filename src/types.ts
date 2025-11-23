@@ -1,21 +1,61 @@
 
-export interface Categoria { id_categoria: number; nombre: string; }
-export interface Marca { id_marca: number; nombre: string; descripcion: string; }
-export interface UnidadMedida { id_unidad: number; nombre: string; abreviatura: string; }
-export interface Presentacion { id_presentacion: number; nombre: string; descripcion: string; }
+// --- ENTIDADES MAESTRAS ---
+
+export interface Categoria {
+  idCategoria: number;
+  nombre: string;
+}
+
+export interface Marca {
+  idMarca: number;
+  nombre: string;
+  descripcion: string;
+}
+
+export interface UnidadMedida {
+  idUnidad: number;
+  nombre: string;
+  abreviatura: string;
+}
+
+export interface Presentacion {
+  idPresentacion: number;
+  nombre: string;
+  descripcion: string;
+}
+
+export interface Subcategoria {
+  idSubcategoria: number;
+  nombre: string;
+  idCategoria: number; // Referencia simple por ahora, o objeto si el backend lo devuelve
+}
+
+export interface Rol {
+  idRol: number;
+  nombre: string;
+  descripcion?: string;
+}
+
+export interface TipoDocumento {
+  idTipoDocumento: number;
+  nombre: string;
+}
+
+// --- ENTIDADES PRINCIPALES ---
 
 export interface Cliente {
-  id_cliente: number;
+  idCliente: number;
   nombre: string;
   apellidos: string;
-  nro_documento: string;
+  nroDocumento: string;
   direccion: string;
   celular: string;
+  estado?: boolean;
 }
 
 export interface Proveedor {
-  id_proveedor: number;
-  razon_social: string;
+  idProveedor: number;
+  razonSocial: string;
   ruc: string;
   direccion: string;
   telefono: string;
@@ -23,57 +63,53 @@ export interface Proveedor {
 }
 
 export interface Producto {
-  id_producto: number;
+  idProducto: number;
   nombre: string;
-  id_categoria: number;
-  id_marca: number;
-  id_unidad: number;
-  id_presentacion: number;
-  precio_referencia: number;
-  codigo_barras?: string;
+  categoria: Categoria;
+  marca: Marca;
+  unidadMedida: UnidadMedida;
+  presentacion: Presentacion;
+  precioReferencia: number;
+  estado?: boolean;
 }
 
 export interface Lote {
-  id_lote: number;
-  id_producto: number;
-  codigo_lote: string;
-  precio_compra: number;
-  precio_venta: number;
-  fecha_vencimiento: string; // YYYY-MM-DD
+  idLote: number;
+  producto: Producto; // Objeto anidado
+  codigoLote: string;
+  precioCompra: number;
+  precioVenta: number;
+  fechaVencimiento: string;
   cantidad: number;
 }
 
-export interface CartItem {
-    product: Producto;
-    quantity: number;
-    price: number;
-}
-
-// --- NUEVAS ENTIDADES MAESTRAS ---
-
-export interface Rol {
-    id_rol: number;
-    nombre: string;
-    descripcion?: string;
-}
-
-export interface TipoDocumento {
-    id_tipo_documento: number;
-    nombre: string;
-}
-
-export interface Subcategoria {
-    id_subcategoria: number;
-    nombre: string;
-    id_categoria: number;
-}
-
 export interface Usuario {
-    id_usuario: number;
-    nombre: string;
-    apellido: string;
-    nombre_usuario: string;
-    password?: string;
-    id_rol: number;
-    correo?: string;
+  idUsuario: number;
+  nombre: string;
+  apellido: string;
+  nombreUsuario: string;
+  password?: string;
+  idRol: number;
+  correo?: string;
+}
+
+// --- DTOs PARA TRANSACCIONES ---
+
+export interface VentaDTO {
+  idCliente: number;
+  idTipoComprobante: number;
+  serie: string;
+  productos: DetalleVentaDTO[];
+}
+
+export interface DetalleVentaDTO {
+  idProducto: number;
+  cantidad: number;
+}
+
+// --- UI HELPERS ---
+export interface CartItem {
+  product: Producto;
+  quantity: number;
+  price: number; // Precio unitario (referencial o del lote)
 }

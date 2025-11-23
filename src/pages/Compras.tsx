@@ -1,23 +1,31 @@
 
 import React, { useState } from 'react';
-import { Producto, Proveedor, Lote } from '../types';
+import { Producto, Proveedor } from '../types';
 import GenericModal from '../components/GenericModal';
+import { purchaseService, CompraDTO, DetalleCompraDTO } from '../services/purchaseService';
 
 interface ComprasProps {
     products: Producto[];
     suppliers: Proveedor[];
-    onConfirmPurchase: (newBatches: Lote[]) => void;
+    onPurchaseSuccess: () => void;
 }
 
-interface PurchaseItem extends Lote {
+interface PurchaseItem {
+    idProducto: number;
     nombreProducto: string;
+    codigoLote: string;
+    precioCompra: number;
+    precioVenta: number;
+    fechaVencimiento: string;
+    cantidad: number;
     subtotal: number;
 }
 
-const Compras: React.FC<ComprasProps> = ({ products, suppliers, onConfirmPurchase }) => {
+const Compras: React.FC<ComprasProps> = ({ products, suppliers, onPurchaseSuccess }) => {
     // --- ESTADOS DE CABECERA ---
-    const [selectedSupplierId, setSelectedSupplierId] = useState<number>(suppliers[0]?.id_proveedor || 0);
+    const [selectedSupplierId, setSelectedSupplierId] = useState<number>(suppliers[0]?.idProveedor || 0);
     const [docType, setDocType] = useState("Factura");
+    const [docTypeId, setDocTypeId] = useState(1); // 1: Factura
     const [docSerie, setDocSerie] = useState("F001");
     const [docNum, setDocNum] = useState("");
     const [docFecha, setDocFecha] = useState(new Date().toISOString().split('T')[0]);
@@ -36,17 +44,17 @@ const Compras: React.FC<ComprasProps> = ({ products, suppliers, onConfirmPurchas
     const [searchTerm, setSearchTerm] = useState("");
 
     // Helpers
-    const selectedSupplier = suppliers.find(s => s.id_proveedor === selectedSupplierId);
-    const selectedProduct = products.find(p => p.id_producto === tempProductId);
+    const selectedSupplier = suppliers.find(s => s.idProveedor === selectedSupplierId);
+    const selectedProduct = products.find(p => p.idProducto === tempProductId);
     const filteredProducts = products.filter(p => p.nombre.toLowerCase().includes(searchTerm.toLowerCase()));
     const totalCompra = purchaseCart.reduce((sum, i) => sum + i.subtotal, 0);
 
     // --- FUNCIONES ---
 
     const handleSelectProduct = (prod: Producto) => {
-        setTempProductId(prod.id_producto);
+        setTempProductId(prod.idProducto);
         setTempCost(0); // Reset costo
-        setTempPrice(prod.precio_referencia || 0);
+        setTempPrice(prod.precioReferencia || 0);
         setTempBatch(`L-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000)}`); // Sugerir lote
         setIsSearchProductOpen(false);
     };
@@ -56,24 +64,23 @@ const Compras: React.FC<ComprasProps> = ({ products, suppliers, onConfirmPurchas
             alert("Por favor complete: Producto, Cantidad, Costo y Lote.");
             return;
         }
-        
-        const prod = products.find(p => p.id_producto === tempProductId);
+
+        const prod = products.find(p => p.idProducto === tempProductId);
         if (!prod) return;
 
         const newItem: PurchaseItem = {
-            id_lote: 0, // Temporal
-            id_producto: prod.id_producto,
+            idProducto: prod.idProducto,
             nombreProducto: prod.nombre,
-            codigo_lote: tempBatch,
-            precio_compra: tempCost,
-            precio_venta: tempPrice,
-            fecha_vencimiento: tempExpiry || '2099-12-31',
+            codigoLote: tempBatch,
+            precioCompra: tempCost,
+            precioVenta: tempPrice,
+            fechaVencimiento: tempExpiry || '2099-12-31',
             cantidad: tempQty,
             subtotal: tempQty * tempCost
         };
 
         setPurchaseCart([...purchaseCart, newItem]);
-        
+
         // Limpiar campos de línea para el siguiente item
         setTempProductId(0);
         setTempQty(1);
@@ -87,21 +94,35 @@ const Compras: React.FC<ComprasProps> = ({ products, suppliers, onConfirmPurchas
         setPurchaseCart(purchaseCart.filter((_, i) => i !== idx));
     };
 
-    const handleSaveCompra = () => {
+    const handleSaveCompra = async () => {
         if (purchaseCart.length === 0) return;
-        if (confirm("¿Confirmar y Guardar Ingreso de Mercadería?")) {
-            const newBatches: Lote[] = purchaseCart.map(item => ({
-                id_lote: 0,
-                id_producto: item.id_producto,
-                codigo_lote: item.codigo_lote,
-                precio_compra: item.precio_compra,
-                precio_venta: item.precio_venta,
-                fecha_vencimiento: item.fecha_vencimiento,
-                cantidad: item.cantidad
-            }));
-            onConfirmPurchase(newBatches);
+        if (!confirm("¿Confirmar y Guardar Ingreso de Mercadería?")) return;
+
+        try {
+            const compraDTO: CompraDTO = {
+                idProveedor: selectedSupplierId,
+                idTipoComprobante: docTypeId, // Asumiendo ID 1 para Factura por defecto o mapear docType
+                serie: docSerie,
+                numero: docNum,
+                fecha: docFecha,
+                detalles: purchaseCart.map(item => ({
+                    idProducto: item.idProducto,
+                    cantidad: item.cantidad,
+                    precioUnitario: item.precioCompra,
+                    codigoLote: item.codigoLote,
+                    fechaVencimiento: item.fechaVencimiento,
+                    precioVenta: item.precioVenta
+                }))
+            };
+
+            await purchaseService.create(compraDTO);
+
+            onPurchaseSuccess();
             setPurchaseCart([]);
             alert("Compra registrada exitosamente. Stock actualizado.");
+
+        } catch (error: any) {
+            alert("Error al guardar compra: " + error.message);
         }
     };
 
@@ -124,17 +145,17 @@ const Compras: React.FC<ComprasProps> = ({ products, suppliers, onConfirmPurchas
                         <div className="col-12 col-md-6 border-end-md">
                             <label className="form-label small fw-bold text-muted">Proveedor</label>
                             <div className="input-group mb-2">
-                                <select 
+                                <select
                                     className="form-select form-select-sm fw-bold"
                                     value={selectedSupplierId}
                                     onChange={(e) => setSelectedSupplierId(Number(e.target.value))}
                                 >
-                                    {suppliers.map(s => <option key={s.id_proveedor} value={s.id_proveedor}>{s.razon_social}</option>)}
+                                    {suppliers.map(s => <option key={s.idProveedor} value={s.idProveedor}>{s.razonSocial}</option>)}
                                 </select>
                                 <button className="btn btn-outline-secondary btn-sm"><i className="fas fa-search"></i></button>
                             </div>
                             <div className="small text-muted">
-                                <strong>RUC:</strong> {selectedSupplier?.ruc || '-'} <span className="mx-2">|</span> 
+                                <strong>RUC:</strong> {selectedSupplier?.ruc || '-'} <span className="mx-2">|</span>
                                 <strong>Dir:</strong> {selectedSupplier?.direccion || '-'}
                             </div>
                         </div>
@@ -144,7 +165,10 @@ const Compras: React.FC<ComprasProps> = ({ products, suppliers, onConfirmPurchas
                             <div className="row g-2">
                                 <div className="col-6 col-md-4">
                                     <label className="form-label small fw-bold text-muted">Tipo Doc.</label>
-                                    <select className="form-select form-select-sm" value={docType} onChange={e => setDocType(e.target.value)}>
+                                    <select className="form-select form-select-sm" value={docType} onChange={e => {
+                                        setDocType(e.target.value);
+                                        setDocTypeId(e.target.value === 'Factura' ? 1 : 2); // Simple mapping
+                                    }}>
                                         <option>Factura</option>
                                         <option>Boleta</option>
                                         <option>Guía Remisión</option>
@@ -180,8 +204,8 @@ const Compras: React.FC<ComprasProps> = ({ products, suppliers, onConfirmPurchas
                             </div>
                         </div>
                         <div className="col-6 col-md-2">
-                             <label className="form-label small fw-bold mb-1">F. Vencimiento</label>
-                             <input type="date" className="form-control form-control-sm" value={tempExpiry} onChange={e => setTempExpiry(e.target.value)} />
+                            <label className="form-label small fw-bold mb-1">F. Vencimiento</label>
+                            <input type="date" className="form-control form-control-sm" value={tempExpiry} onChange={e => setTempExpiry(e.target.value)} />
                         </div>
                         <div className="col-6 col-md-1">
                             <label className="form-label small fw-bold mb-1">Cant.</label>
@@ -209,7 +233,7 @@ const Compras: React.FC<ComprasProps> = ({ products, suppliers, onConfirmPurchas
             </div>
 
             {/* BLOQUE INFERIOR: TABLA DETALLE */}
-            <div className="card shadow border-0" style={{minHeight: '300px'}}>
+            <div className="card shadow border-0" style={{ minHeight: '300px' }}>
                 <div className="card-body p-0">
                     <div className="table-responsive">
                         <table className="table table-bordered table-hover mb-0 align-middle table-sm">
@@ -222,7 +246,7 @@ const Compras: React.FC<ComprasProps> = ({ products, suppliers, onConfirmPurchas
                                     <th className="py-2 text-end">P. Compra</th>
                                     <th className="py-2 text-end">P. Venta</th>
                                     <th className="py-2 text-end">Subtotal</th>
-                                    <th className="py-2 text-center" style={{width: '50px'}}></th>
+                                    <th className="py-2 text-center" style={{ width: '50px' }}></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -237,11 +261,11 @@ const Compras: React.FC<ComprasProps> = ({ products, suppliers, onConfirmPurchas
                                     purchaseCart.map((item, idx) => (
                                         <tr key={idx}>
                                             <td className="ps-3 fw-bold text-primary">{item.nombreProducto}</td>
-                                            <td className="text-center small">{item.codigo_lote}</td>
-                                            <td className="text-center small">{item.fecha_vencimiento}</td>
+                                            <td className="text-center small">{item.codigoLote}</td>
+                                            <td className="text-center small">{item.fechaVencimiento}</td>
                                             <td className="text-center">{item.cantidad}</td>
-                                            <td className="text-end">{item.precio_compra.toFixed(2)}</td>
-                                            <td className="text-end">{item.precio_venta.toFixed(2)}</td>
+                                            <td className="text-end">{item.precioCompra.toFixed(2)}</td>
+                                            <td className="text-end">{item.precioVenta.toFixed(2)}</td>
                                             <td className="text-end fw-bold">S/. {item.subtotal.toFixed(2)}</td>
                                             <td className="text-center">
                                                 <button className="btn btn-link text-danger btn-sm p-0" onClick={() => handleRemoveItem(idx)}>
@@ -277,33 +301,33 @@ const Compras: React.FC<ComprasProps> = ({ products, suppliers, onConfirmPurchas
             </div>
 
             {/* MODAL BUSCADOR DE PRODUCTOS */}
-            <GenericModal 
-                title="Buscar Producto" 
-                isOpen={isSearchProductOpen} 
+            <GenericModal
+                title="Buscar Producto"
+                isOpen={isSearchProductOpen}
                 onClose={() => setIsSearchProductOpen(false)}
-                onSave={() => {}} // No action needed on save, selection does action
+                onSave={() => { }} // No action needed on save, selection does action
                 size="modal-lg"
             >
                 <div className="mb-3">
-                    <input 
-                        type="text" 
-                        className="form-control" 
-                        placeholder="Escriba nombre del producto..." 
+                    <input
+                        type="text"
+                        className="form-control"
+                        placeholder="Escriba nombre del producto..."
                         autoFocus
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
                     />
                 </div>
-                <div className="list-group overflow-auto" style={{maxHeight: '300px'}}>
+                <div className="list-group overflow-auto" style={{ maxHeight: '300px' }}>
                     {filteredProducts.map(p => (
-                        <button 
-                            key={p.id_producto} 
+                        <button
+                            key={p.idProducto}
                             className="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
                             onClick={() => handleSelectProduct(p)}
                         >
                             <div>
                                 <div className="fw-bold">{p.nombre}</div>
-                                <div className="small text-muted">Ref. Venta: S/. {p.precio_referencia.toFixed(2)}</div>
+                                <div className="small text-muted">Ref. Venta: S/. {p.precioReferencia.toFixed(2)}</div>
                             </div>
                             <i className="fas fa-chevron-right text-muted"></i>
                         </button>

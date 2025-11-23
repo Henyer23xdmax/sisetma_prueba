@@ -22,3 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Backend
+backend/target/
+backend/.mvn/
+backend/mvnw
+backend/mvnw.cmd
+backend/*.log
+backend/.idea/
+backend/*.iml
